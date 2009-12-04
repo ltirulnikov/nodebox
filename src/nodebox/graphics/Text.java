@@ -9,6 +9,8 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.text.AttributedString;
 import java.util.Iterator;
+import java.util.ArrayList;
+import java.text.AttributedCharacterIterator;
 
 public class Text extends AbstractGrob {
 
@@ -246,6 +248,9 @@ public class Text extends AbstractGrob {
         private AttributedString styledText;
         private LineBreakMeasurer measurer;
         private boolean first;
+        private ArrayList lines;
+        private int currentNewLine;
+        
 
         private TextLayoutIterator() {
             x = 0;
@@ -253,6 +258,15 @@ public class Text extends AbstractGrob {
             styledText = getStyledText();
             measurer = new LineBreakMeasurer(styledText.getIterator(), new FontRenderContext(new AffineTransform(), true, true));
             first = true;
+            lines = new ArrayList<Integer>();
+            AttributedCharacterIterator it = styledText.getIterator();
+            for (char c = it.first(); c != it.DONE; c = it.next()) {
+                if (c == '\n') {
+                    lines.add(it.getIndex());
+                }
+            }
+            currentNewLine = 0;
+            
         }
 
         public boolean hasNext() {
@@ -263,10 +277,21 @@ public class Text extends AbstractGrob {
             if (first) {
                 first = false;
             } else {
-                y += ascent * lineHeight;
+                y += ascent * (lineHeight > 0 ? lineHeight : 1);
             }
             float layoutWidth = width == 0 ? Float.MAX_VALUE : (float) width;
-            TextLayout layout = measurer.nextLayout(layoutWidth);
+            
+            TextLayout layout;
+            if (currentNewLine < lines.size()) { 
+                Integer current = (Integer)lines.get(currentNewLine);
+                layout = measurer.nextLayout(layoutWidth, current + 1, false);
+                if (current + 1 ==  measurer.getPosition()) {
+                    currentNewLine++;
+                }
+            } else {
+                layout = measurer.nextLayout(layoutWidth);
+            }
+            
             if (width == 0) {
                 layoutWidth = layout.getAdvance();
                 if (align == Align.RIGHT) {
